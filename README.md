@@ -45,7 +45,27 @@ cp .env.example .env.local
 - Next.js (Frontend & API routes)
 - Firebase Firestore (Database)
 - Shopify API (Store integration)
+  - Store One: Naked Armor
+  - Store Two: Grown Man Shave
 - Vercel (Deployment)
+
+### Environment Setup
+1. Copy the `.env.example` file to create a new `.env` file:
+```bash
+cp .env.example .env
+```
+
+2. Fill in your Firebase credentials in `.env`:
+- Get these from your Firebase Console
+- Project Settings > General > Your Apps
+- Create a new Web App if needed
+
+3. Fill in your Shopify credentials in `.env`:
+- Get these from your Shopify Partner account
+- Apps > App Setup
+- API credentials section
+
+4. Never commit the `.env` file to version control
 
 ### System Design
 [Include a basic system diagram showing the flow between Shopify stores, webhooks, and your warehouse system]
