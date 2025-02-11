@@ -4,6 +4,36 @@ Build a Shopify app that tracks inventory levels from two different Shopify stor
 
 The app will be built using the Shopify API and the Next.js framework. The app will be deployed to Vercel.
 
+Check if your products in the database have the shopifyProducts field configured?
+
+We use the SKU to track and lookup products. Our goal is to call the api, look through each shopify store's product catalog (by sku) and once we find the product we update that product from our master sku.
+
+The second function is when an product sells on either of the shopify stores, then it updates the master application with the new inventory level and we then push the new inventory level back to both shopify stores to update the inventory with a unified inventory calculation.
+
+We have the Sync buttons while we are testing the stores and application but once we know the api works and our application is functioning as intended then we will set up a cron job to run inventory function at a regualr interval.
+
+Please review the shopify documentation:
+
+@https://shopify.dev/docs/apps/build/orders-fulfillment/inventory-management-apps#webhooks 
+
+Let's focus on getting the system to work as intended, going step by step to to allow us to call shopify api, search through the shopify product catalog by sku, find the inventory number and then overwrite the shopify inventory with our master inventory.
+Let's get step one working first.
+
+Step 1:
+Connect to Naked Armor using the proper call functions via api and manual sync button, lookup sku and inventory, update each product in shopfy with the master inventory levels in our application.
+
+Step 2:
+Repeat steps one with second store Grown Man Shave.
+
+Step 3:
+Update master inventory once a product sells on shopify and depricate the master inventory to refelct the new inventory on hand. Repeat with each store via manual sync.
+
+Step 4:
+Use the master inventory to update each shopify store with the new inventory level via Manual Sync button.
+
+Stap 5:
+Create a cron job that fires the aplication and api to replace the manual sync button every 15 mins. Keep the manual sync in place in case a manual sync is required.
+
 ## Features
 
 - Track inventory levels from two different Shopify stores
@@ -132,7 +162,6 @@ Use Firebase Firestore for the database.
 - `OnHand` (number)
 - `LastUpdated` (timestamp)
 - `StoreIdentifier` (string)
-- `ShopifyProductId` (string)
 - `Status` (string)
 
 #### Audit Collection
