@@ -31,6 +31,17 @@ const nakedArmorClient = createAdminApiClient({
   }
 });
 
+// Add Grown Man Shave client alongside existing Naked Armor client
+const grownManShaveClient = createAdminApiClient({
+  storeDomain: process.env.SHOPIFY_STORE_TWO_URL || '',
+  accessToken: process.env.SHOPIFY_STORE_TWO_ACCESS_TOKEN || '',
+  apiVersion: '2025-01',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Shopify-Access-Token': process.env.SHOPIFY_STORE_TWO_ACCESS_TOKEN || ''
+  }
+});
+
 // Helper function to get the appropriate client based on store identifier
 function getClientForStore(storeIdentifier: ShopifyStore) {
   console.log('Getting client for store:', storeIdentifier);
@@ -40,6 +51,9 @@ function getClientForStore(storeIdentifier: ShopifyStore) {
     STORE_ONE_URL: process.env.SHOPIFY_STORE_ONE_URL,
     STORE_ONE_TOKEN: process.env.SHOPIFY_STORE_ONE_ACCESS_TOKEN ? 'Set' : 'Not Set',
     STORE_ONE_LOCATION: process.env.SHOPIFY_STORE_ONE_LOCATION_ID,
+    STORE_TWO_URL: process.env.SHOPIFY_STORE_TWO_URL,
+    STORE_TWO_TOKEN: process.env.SHOPIFY_STORE_TWO_ACCESS_TOKEN ? 'Set' : 'Not Set',
+    STORE_TWO_LOCATION: process.env.SHOPIFY_STORE_TWO_LOCATION_ID,
     NODE_ENV: process.env.NODE_ENV,
     API_VERSION: '2025-01'
   });
@@ -65,8 +79,22 @@ function getClientForStore(storeIdentifier: ShopifyStore) {
   }
   
   if (storeIdentifier === 'grown-man-shave') {
-    // For now, we'll just throw an error since this store isn't configured
-    throw new Error('Grown Man Shave store is not currently configured');
+    if (!process.env.SHOPIFY_STORE_TWO_URL) {
+      throw new Error('Missing SHOPIFY_STORE_TWO_URL');
+    }
+    if (!process.env.SHOPIFY_STORE_TWO_ACCESS_TOKEN) {
+      throw new Error('Missing SHOPIFY_STORE_TWO_ACCESS_TOKEN');
+    }
+
+    return createAdminApiClient({
+      storeDomain: process.env.SHOPIFY_STORE_TWO_URL,
+      accessToken: process.env.SHOPIFY_STORE_TWO_ACCESS_TOKEN,
+      apiVersion: '2025-01',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': process.env.SHOPIFY_STORE_TWO_ACCESS_TOKEN
+      }
+    });
   }
 
   throw new Error(`Invalid store identifier: ${storeIdentifier}`);
