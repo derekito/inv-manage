@@ -4,18 +4,33 @@ import { updateProduct, getProductBySku } from '@/lib/db';
 import { syncProductWithBothStores } from '@/lib/shopify';
 
 // Verify Shopify webhook
-function verifyShopifyWebhook(req: NextApiRequest): boolean {
+function verifyShopifyWebhook(req: NextApiRequest, secret: string) {
   const hmac = req.headers['x-shopify-hmac-sha256'] as string;
-  const topic = req.headers['x-shopify-topic'] as string;
-  const shop = req.headers['x-shopify-shop-domain'] as string;
-  const rawBody = JSON.stringify(req.body);
-
+  const body = req.body;
+  
   const hash = crypto
-    .createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET || '')
-    .update(rawBody, 'utf8')
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(body))
     .digest('base64');
-
+  
   return hmac === hash;
+}
+
+// Get store config based on shop domain
+function getStoreConfig(shopDomain: string) {
+  if (shopDomain === process.env.SHOPIFY_STORE_ONE_URL) {
+    return {
+      name: 'naked-armor',
+      secret: process.env.SHOPIFY_STORE_ONE_WEBHOOK_SECRET
+    };
+  }
+  if (shopDomain === process.env.SHOPIFY_STORE_TWO_URL) {
+    return {
+      name: 'grown-man-shave',
+      secret: process.env.SHOPIFY_STORE_TWO_WEBHOOK_SECRET
+    };
+  }
+  return null;
 }
 
 export const config = {
@@ -26,95 +41,69 @@ export const config = {
   },
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
+    const shopDomain = req.headers['x-shopify-shop-domain'] as string;
+    const storeConfig = getStoreConfig(shopDomain);
+
+    if (!storeConfig || !storeConfig.secret) {
+      console.error('Invalid shop domain or missing webhook secret');
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
     // Verify webhook authenticity
-    if (!verifyShopifyWebhook(req)) {
+    if (!verifyShopifyWebhook(req, storeConfig.secret)) {
       console.error('Invalid webhook signature');
-      return res.status(401).json({ message: 'Invalid webhook signature' });
+      return res.status(403).json({ message: 'Invalid signature' });
     }
 
-    // Parse webhook body
-    const body = JSON.parse(req.body.toString());
-    const topic = req.headers['x-shopify-topic'] as string;
-    const shop = req.headers['x-shopify-shop-domain'] as string;
-
-    console.log('Received webhook:', {
-      topic,
-      shop,
-      body
+    const order = req.body;
+    console.log('Received order webhook:', {
+      store: storeConfig.name,
+      orderId: order.id,
+      orderNumber: order.order_number
     });
 
-    // Handle inventory_items/update webhook
-    if (topic === 'inventory_items/update') {
-      const { id: inventoryItemId, sku, available } = body;
-      
-      if (!sku) {
-        console.error('No SKU provided in webhook');
-        return res.status(400).json({ message: 'No SKU provided' });
-      }
+    // Process each line item in the order
+    for (const item of order.line_items) {
+      const sku = item.sku;
+      const quantity = item.quantity;
 
-      // Get product from our database
+      if (!sku) continue;
+
+      console.log('Processing order item:', { sku, quantity });
+
+      // Get current product from database
       const product = await getProductBySku(sku);
-      
       if (!product) {
-        console.error(`Product not found with SKU: ${sku}`);
-        return res.status(404).json({ message: 'Product not found' });
+        console.error(`Product not found for SKU: ${sku}`);
+        continue;
       }
 
-      // Update our master inventory
-      const updatedProduct = {
-        ...product,
-        onHand: available,
+      // Calculate new inventory
+      const newQuantity = Math.max(0, product.onHand - quantity);
+      
+      // Update product in database
+      await updateProduct(product.id, {
+        onHand: newQuantity,
         lastUpdated: new Date()
-      };
+      });
 
-      await updateProduct(product.id, updatedProduct);
-
-      // Sync the updated inventory with both stores
-      const syncResults = await syncProductWithBothStores(updatedProduct);
-
-      console.log('Sync results:', syncResults);
-
-      return res.status(200).json({
-        message: 'Inventory updated successfully',
-        results: syncResults
+      console.log('Updated inventory:', {
+        sku,
+        previousQuantity: product.onHand,
+        newQuantity,
+        store: storeConfig.name
       });
     }
 
-    // Handle inventory_levels/update webhook
-    if (topic === 'inventory_levels/update') {
-      const { inventory_item_id, location_id, available } = body;
-      
-      // Log the inventory level update
-      console.log('Inventory level update:', {
-        inventory_item_id,
-        location_id,
-        available
-      });
-
-      // You might want to look up the product by inventory_item_id
-      // This would require maintaining a mapping of inventory_item_ids to SKUs
-      
-      return res.status(200).json({ message: 'Inventory level update received' });
-    }
-
-    // Handle other webhook topics as needed
-    console.log('Unhandled webhook topic:', topic);
-    return res.status(200).json({ message: 'Webhook received' });
-
+    res.status(200).json({ message: 'Webhook processed successfully' });
   } catch (error) {
-    console.error('Webhook error:', error);
-    return res.status(500).json({
-      message: 'Error processing webhook',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    console.error('Webhook processing error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 } 
