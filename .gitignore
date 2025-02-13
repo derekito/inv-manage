@@ -38,4 +38,12 @@ next-env.d.ts
 
 # IDE
 .idea
-.vscode 
+.vscode
+
+# Environment variables
+.env
+.env.local
+.env*.local
+
+# Keep example file
+!.env.example 

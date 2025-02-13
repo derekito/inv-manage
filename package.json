@@ -7,15 +7,17 @@
     "start": "next start",
     "lint": "next lint",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d out"
   },
   "dependencies": {
     "@shopify/admin-api-client": "^1.0.5",
     "@shopify/shopify-api": "^11.8.1",
     "@types/papaparse": "^5.3.15",
     "firebase": "^11.2.0",
+    "firebase-admin": "^13.1.0",
     "next": "14.1.0",
     "papaparse": "^5.5.2",
+    "raw-body": "^3.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -24,6 +26,7 @@
     "@types/react": "^18.2.52",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.17",
+    "gh-pages": "^6.1.1",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3"

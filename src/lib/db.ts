@@ -95,41 +95,13 @@ export async function addProduct(productData: Omit<Product, 'id' | 'createdAt' |
   }
 }
 
-export async function updateProduct(id: string, updates: Partial<Product>) {
+export async function updateProduct(id: string, data: any) {
   try {
-    if (!id) {
-      throw new Error('Product ID is required for update');
-    }
-
     const productRef = doc(db, 'products', id);
-    const productSnap = await getDoc(productRef);
-    
-    if (!productSnap.exists()) {
-      throw new Error('Product not found');
-    }
-
-    const currentProduct = productSnap.data() as Product;
-    
-    // Clean the updates object by removing undefined values
-    const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-      if (value !== undefined && value !== '') {
-        acc[key] = value;
-      }
-      return acc;
-    }, {} as Partial<Product>);
-
-    // Create the final update object
-    const updatedProduct = {
-      ...cleanedUpdates,
-      lastUpdated: serverTimestamp(),
-      // Preserve fields that shouldn't be updated
-      sku: currentProduct.sku,
-      userId: currentProduct.userId,
-      createdAt: currentProduct.createdAt
-    };
-
-    await updateDoc(productRef, updatedProduct);
-    return { id, ...currentProduct, ...updatedProduct };
+    return await updateDoc(productRef, {
+      ...data,
+      lastUpdated: serverTimestamp()
+    });
   } catch (error) {
     console.error('Error updating product:', error);
     throw error;
@@ -241,17 +213,14 @@ export type ShopifyStoreConfig = {
 };
 
 // Add this function if it doesn't exist
-export async function getProductBySku(sku: string): Promise<Product | null> {
+export async function getProductBySku(sku: string) {
   try {
     const q = query(productsCollection, where('sku', '==', sku));
     const querySnapshot = await getDocs(q);
-    
-    if (querySnapshot.empty) {
-      return null;
-    }
 
+    if (querySnapshot.empty) return null;
     const doc = querySnapshot.docs[0];
-    return { ...doc.data(), id: doc.id } as Product;
+    return { id: doc.id, ...doc.data() };
   } catch (error) {
     console.error('Error getting product by SKU:', error);
     throw error;
