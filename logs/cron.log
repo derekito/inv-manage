@@ -1,0 +1,75 @@
+[2025-02-14T00:09:01.411Z] INFO 🔄 Starting scheduled inventory sync
+[2025-02-14T00:09:01.742Z] INFO 📦 Found products to sync {
+  "count": 1
+}
+[2025-02-14T00:09:02.013Z] INFO ✅ Sync complete {
+  "totalProducts": 1,
+  "nakedArmor": {
+    "successful": 0,
+    "failed": 1,
+    "skipped": 0,
+    "errors": [
+      "SS-NOG: Shopify API error: Bad Request"
+    ]
+  },
+  "grownManShave": {
+    "successful": 0,
+    "failed": 0,
+    "skipped": 1,
+    "errors": []
+  },
+  "duration": "0.601s"
+}
+[2025-02-14T00:11:57.076Z] INFO 🔄 Starting scheduled inventory sync
+[2025-02-14T00:11:57.411Z] INFO 📦 Found products to sync {
+  "count": 1
+}
+[2025-02-14T00:11:57.628Z] INFO ✅ Sync complete {
+  "totalProducts": 1,
+  "nakedArmor": {
+    "successful": 0,
+    "failed": 1,
+    "skipped": 0,
+    "errors": [
+      "SS-NOG: Shopify API error: Bad Request\n{\n  \"errors\": {\n    \"location_id\": \"expected String to be a id\"\n  }\n}"
+    ]
+  },
+  "grownManShave": {
+    "successful": 0,
+    "failed": 0,
+    "skipped": 1,
+    "errors": []
+  },
+  "duration": "0.552s"
+}
+[2025-02-14T00:14:00.137Z] INFO 🔄 Starting scheduled inventory sync
+[2025-02-14T00:14:00.297Z] INFO 📦 Found products to sync {
+  "count": 1
+}
+[2025-02-14T00:14:01.987Z] INFO ✅ Sync complete {
+  "totalProducts": 1,
+  "results": [
+    {
+      "sku": "SS-NOG",
+      "results": [
+        {
+          "sku": "SS-NOG",
+          "store": "naked-armor",
+          "success": true,
+          "previousQuantity": 1,
+          "newQuantity": 51,
+          "message": "Updated inventory from 1 to 51"
+        },
+        {
+          "sku": "SS-NOG",
+          "store": "grown-man-shave",
+          "success": true,
+          "previousQuantity": 1,
+          "newQuantity": 51,
+          "message": "Updated inventory from 1 to 51"
+        }
+      ]
+    }
+  ],
+  "duration": "1.85s"
+}

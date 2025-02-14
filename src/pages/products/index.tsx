@@ -5,6 +5,7 @@ import ProductEditModal from '@/components/ProductEditModal';
 import CsvImportModal from '@/components/CsvImportModal';
 import { toast } from '@/lib/toast';
 import { syncAllProducts } from '@/lib/shopify';
+import { useRouter } from 'next/router';
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -17,6 +18,10 @@ export default function Products() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showUpdateMode, setShowUpdateMode] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     loadProducts();
@@ -124,24 +129,44 @@ export default function Products() {
     }
   };
 
-  const handleImportProducts = async (products: Omit<Product, 'id' | 'userId' | 'createdAt' | 'lastUpdated'>[]) => {
+  const handleImportProducts = async (csvData: any[]) => {
     try {
-      for (const product of products) {
-        await addProduct(product);
-      }
-      await loadProducts();
-      toast({
-        title: 'Success',
-        description: `Successfully imported ${products.length} products`,
+      // Determine if this is an update or import based on button clicked
+      const endpoint = showUpdateMode ? '/api/update-products' : '/api/import-csv';
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ products: csvData })
       });
-    } catch (err) {
-      console.error('Error importing products:', err);
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: 'Success',
+          description: `${result.results.updated} products ${showUpdateMode ? 'updated' : 'imported'} successfully`,
+        });
+        await loadProducts();
+      } else {
+        toast({
+          title: 'Error',
+          description: result.message,
+          variant: 'destructive',
+        });
+      }
+
+    } catch (error) {
+      console.error('Operation failed:', error);
       toast({
         title: 'Error',
-        description: 'Failed to import products',
+        description: 'Failed to process products',
         variant: 'destructive',
       });
-      throw err;
+    } finally {
+      setShowImportModal(false);
     }
   };
 
@@ -220,6 +245,49 @@ export default function Products() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (!selectedProducts.length) return;
+    
+    if (!confirm(`Are you sure you want to delete ${selectedProducts.length} products?`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await Promise.all(selectedProducts.map(id => deleteProduct(id)));
+      setSelectedProducts([]);
+      await loadProducts();
+      toast({
+        title: 'Success',
+        description: `${selectedProducts.length} products deleted successfully`,
+      });
+    } catch (error) {
+      console.error('Error deleting products:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete products',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleUpdateProducts = async () => {
+    // Show the import modal first
+    setShowImportModal(true);
+  };
+
+  const handleImportClick = () => {
+    setShowUpdateMode(false);
+    setShowImportModal(true);
+  };
+
+  const handleUpdateClick = () => {
+    setShowUpdateMode(true);
+    setShowImportModal(true);
+  };
+
   const filteredProducts = products.filter(product => 
     product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.sku.toLowerCase().includes(searchQuery.toLowerCase())
@@ -239,16 +307,22 @@ export default function Products() {
         <h1 className="text-2xl font-bold">Products</h1>
         <div className="flex space-x-4">
           <button
-            onClick={handleAddClick}
+            onClick={() => router.push('/products/new')}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             Add New Product
           </button>
           <button
-            onClick={() => setShowImportModal(true)}
+            onClick={handleImportClick}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
           >
             Import CSV
+          </button>
+          <button
+            onClick={handleUpdateClick}
+            className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
+          >
+            Update From CSV
           </button>
           <div className="flex space-x-2">
             <button
@@ -279,42 +353,66 @@ export default function Products() {
         />
       </div>
 
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+      {selectedProducts.length > 0 && (
+        <div className="mb-4 p-2 bg-gray-100 rounded flex items-center justify-between">
+          <span>{selectedProducts.length} products selected</span>
+          <button
+            onClick={handleBulkDelete}
+            disabled={isDeleting}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50"
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Selected'}
+          </button>
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full table-fixed divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px]">SKU</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px]">Primary Location</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">Primary Stock</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px]">Secondary Location</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">Secondary Stock</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">Status</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px]">Actions</th>
+              <th className="w-24 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+              <th className="w-48 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+              <th className="w-32 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Primary Loc</th>
+              <th className="w-20 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">Stock</th>
+              <th className="w-32 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Secondary Loc</th>
+              <th className="w-20 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">Stock</th>
+              <th className="w-20 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="w-24 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="w-10 px-2 py-3 text-center">
+                <input
+                  type="checkbox"
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setSelectedProducts(checked ? filteredProducts.map(p => p.id) : []);
+                  }}
+                  checked={selectedProducts.length === filteredProducts.length}
+                  className="rounded border-gray-300"
+                />
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredProducts.map((product) => (
               <tr key={product.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{product.sku}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">{product.sku}</td>
+                <td className="px-2 py-3 text-sm text-gray-900">{product.productName}</td>
+                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
                   {product.location ? `${product.location.loc1}-${product.location.loc2}-${product.location.loc3}-${product.location.loc4}` : 'N/A'}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{product.onHand}</td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900 text-center">{product.onHand}</td>
+                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
                   {product.location2 ? `${product.location2.loc1}-${product.location2.loc2}-${product.location2.loc3}-${product.location2.loc4}` : 'N/A'}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{product.location2?.onHand || 0}</td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm">
+                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900 text-center">{product.location2?.onHand || 0}</td>
+                <td className="px-2 py-3 whitespace-nowrap text-sm">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     product.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
                     {product.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                  <div className="flex justify-end items-center space-x-2">
+                <td className="px-2 py-3 whitespace-nowrap text-sm text-center">
+                  <div className="flex justify-center items-center space-x-2">
                     <button
                       onClick={() => handleEditClick(product)}
                       className="text-blue-600 hover:text-blue-900"
@@ -332,6 +430,20 @@ export default function Products() {
                       {deletingProduct?.id === product.id ? '...' : 'Delete'}
                     </button>
                   </div>
+                </td>
+                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.includes(product.id)}
+                    onChange={e => {
+                      setSelectedProducts(prev => 
+                        e.target.checked
+                          ? [...prev, product.id]
+                          : prev.filter(id => id !== product.id)
+                      );
+                    }}
+                    className="rounded border-gray-300"
+                  />
                 </td>
               </tr>
             ))}
@@ -359,8 +471,12 @@ export default function Products() {
 
       <CsvImportModal
         isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
+        onClose={() => {
+          setShowImportModal(false);
+          setShowUpdateMode(false);
+        }}
         onImport={handleImportProducts}
+        mode={showUpdateMode ? 'update' : 'import'}
       />
     </div>
   );

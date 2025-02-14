@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, Timestamp, serverTimestamp, limit } from 'firebase/firestore';
 import { Product, Location, InventoryUpdate } from '../types';
 import { auth } from './firebase';
 
@@ -108,14 +108,14 @@ export async function updateProduct(id: string, data: any) {
   }
 }
 
-export async function deleteProduct(sku: string): Promise<void> {
-  const product = await getProduct(sku);
-  if (!product) {
-    throw new Error('Product not found');
+export async function deleteProduct(id: string): Promise<void> {
+  try {
+    const productRef = doc(db, 'products', id);
+    await deleteDoc(productRef);
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    throw error;
   }
-  
-  const docRef = doc(productsCollection, product.id);
-  await deleteDoc(docRef);
 }
 
 // Location Operations
@@ -223,6 +223,105 @@ export async function getProductBySku(sku: string) {
     return { id: doc.id, ...doc.data() };
   } catch (error) {
     console.error('Error getting product by SKU:', error);
+    throw error;
+  }
+}
+
+// First, add a function to get product ID by SKU
+async function getProductIdBySku(sku: string): Promise<string | null> {
+  const q = query(productsCollection, where('sku', '==', sku.trim()));
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.empty) return null;
+  return snapshot.docs[0].id;
+}
+
+// Modify the upsertProductFromCsv function to use a transaction
+export async function upsertProductFromCsv(productData: Partial<Product>) {
+  try {
+    if (!productData.sku) {
+      throw new Error('SKU is required for import');
+    }
+
+    const sku = productData.sku.trim();
+    console.log('Processing SKU:', sku);
+
+    // Query for existing product with this SKU
+    const q = query(productsCollection, where('sku', '==', sku), limit(1));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      throw new Error(`No product found with SKU: ${sku}`);
+    }
+
+    const existingDoc = querySnapshot.docs[0];
+    const existingData = existingDoc.data();
+
+    // Prepare update data while preserving critical fields
+    const updateData = {
+      ...productData,
+      lastUpdated: serverTimestamp(),
+      // Preserve these fields exactly as they are
+      sku: existingData.sku,
+      createdAt: existingData.createdAt,
+      userId: existingData.userId,
+      shopifyProducts: existingData.shopifyProducts,
+      id: existingDoc.id
+    };
+
+    // Update the document directly using its reference
+    await updateDoc(doc(productsCollection, existingDoc.id), updateData);
+
+    console.log(`Updated product with SKU ${sku}`, {
+      id: existingDoc.id,
+      before: existingData,
+      after: updateData
+    });
+
+    return { 
+      status: 'updated', 
+      sku,
+      id: existingDoc.id 
+    };
+
+  } catch (error) {
+    console.error('Error in upsertProductFromCsv:', error);
+    throw error;
+  }
+}
+
+// Test function using same approach as getProductBySku
+export async function testSkuLookup(sku: string) {
+  try {
+    if (!sku) {
+      throw new Error('SKU is required');
+    }
+
+    // Use the same collection reference and query structure as getProductBySku
+    const q = query(productsCollection, where('sku', '==', sku));
+    const querySnapshot = await getDocs(q);
+
+    // Log the results
+    console.log('SKU Lookup Results:', {
+      searchedSku: sku,
+      found: querySnapshot.size,
+      matches: querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        sku: doc.data().sku,
+        productName: doc.data().productName
+      }))
+    });
+
+    // Return in the same format as other functions
+    if (querySnapshot.empty) return [];
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+  } catch (error) {
+    console.error('SKU Lookup Error:', error);
     throw error;
   }
 } 

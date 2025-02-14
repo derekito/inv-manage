@@ -4,7 +4,19 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Products collection
     match /products/{productId} {
-      allow read, write: if true;  // Allow all operations for now
+      // Allow read operations
+      allow read: if true;
+      
+      // Allow write with SKU validation
+      allow write: if request.auth != null;
+      
+      // Add validation rule for SKU uniqueness
+      allow create: if !exists(/databases/$(database)/documents/products/**[sku == request.resource.data.sku]);
+      allow update: if 
+        // Allow updating same document
+        (resource.data.sku == request.resource.data.sku) ||
+        // Or if new SKU doesn't exist elsewhere
+        !exists(/databases/$(database)/documents/products/**[sku == request.resource.data.sku]);
     }
 
     // Other collections can keep their existing rules

@@ -6,10 +6,11 @@ import { Product } from '@/types';
 interface CsvImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (data: Omit<Product, 'id' | 'userId' | 'createdAt' | 'lastUpdated'>[]) => Promise<void>;
+  onImport: (data: any[]) => void;
+  mode?: 'import' | 'update';
 }
 
-export default function CsvImportModal({ isOpen, onClose, onImport }: CsvImportModalProps) {
+export default function CsvImportModal({ isOpen, onClose, onImport, mode = 'import' }: CsvImportModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -90,7 +91,9 @@ export default function CsvImportModal({ isOpen, onClose, onImport }: CsvImportM
     <Modal isOpen={isOpen} onClose={onClose}>
       <div className="bg-white p-6 rounded-lg max-w-lg w-full">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Import Products from CSV</h2>
+          <h2 className="text-xl font-bold">
+            {mode === 'update' ? 'Update Products from CSV' : 'Import Products from CSV'}
+          </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
         </div>
 
